@@ -127,46 +127,49 @@ def main(args: DictConfig):
     # ------------------
     model = EVFlowNet(args.train).to(device)
 
-    # ------------------
-    #   optimizer
-    # ------------------
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.train.initial_learning_rate, weight_decay=args.train.weight_decay)
-    # ------------------
-    #   Start training
-    # ------------------
-    model.train()
-    for epoch in range(args.train.epochs):
-        total_loss = 0
-        print("on epoch: {}".format(epoch+1))
-        for i, batch in enumerate(tqdm(train_data)):
-            batch: Dict[str, Any]
-            event_image = batch["event_volume"].to(device) # [B, 4, 480, 640]
-            ground_truth_flow = batch["flow_gt"].to(device) # [B, 2, 480, 640]
-            # CHANGED
-            flow = model(event_image) # [B, 2, 480, 640]
-            loss: torch.Tensor = compute_epe_error(flow, ground_truth_flow)
-            # outputs = model(event_image)  # モデルが各スケールのフローを返す
-            # loss = compute_multiscale_epe_error(outputs, ground_truth_flow, device=device)
-            print(f"batch {i} loss: {loss.item()}")
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+    # # ------------------
+    # #   optimizer
+    # # ------------------
+    # optimizer = torch.optim.Adam(model.parameters(), lr=args.train.initial_learning_rate, weight_decay=args.train.weight_decay)
+    # # ------------------
+    # #   Start training
+    # # ------------------
+    # model.train()
+    # for epoch in range(args.train.epochs):
+    #     total_loss = 0
+    #     print("on epoch: {}".format(epoch+1))
+    #     for i, batch in enumerate(tqdm(train_data)):
+    #         batch: Dict[str, Any]
+    #         event_image = batch["event_volume"].to(device) # [B, 4, 480, 640]
+    #         ground_truth_flow = batch["flow_gt"].to(device) # [B, 2, 480, 640]
+    #         # CHANGED
+    #         # flow = model(event_image) # [B, 2, 480, 640]
+    #         # loss: torch.Tensor = compute_epe_error(flow, ground_truth_flow)
+    #         outputs = model(event_image)  # モデルが各スケールのフローを返す
+    #         loss = compute_multiscale_epe_error(outputs, ground_truth_flow, device=device)
+    #         print(f"batch {i} loss: {loss.item()}")
+    #         optimizer.zero_grad()
+    #         loss.backward()
+    #         optimizer.step()
 
-            total_loss += loss.item()
-        print(f'Epoch {epoch+1}, Loss: {total_loss / len(train_data)}')
+    #         total_loss += loss.item()
+    #     print(f'Epoch {epoch+1}, Loss: {total_loss / len(train_data)}')
 
-    # Create the directory if it doesn't exist
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
+    # # Create the directory if it doesn't exist
+    # if not os.path.exists('checkpoints'):
+    #     os.makedirs('checkpoints')
     
-    current_time = time.strftime("%Y%m%d%H%M%S")
-    model_path = f"checkpoints/model_{current_time}.pth"
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
+    # current_time = time.strftime("%Y%m%d%H%M%S")
+    # model_path = f"checkpoints/model_{current_time}.pth"
+    # torch.save(model.state_dict(), model_path)
+    # print(f"Model saved to {model_path}")
 
     # ------------------
     #   Start predicting
     # ------------------
+    # model_path = "checkpoints/model_20240710065718_002.pth" # multi epoch10 score 69.1675
+    # model_path = "checkpoints/model_20240712033124_003.pth" # multt epoch30 score 103.6782
+    model_path = "checkpoints/model_20240712040327_004.pth" # multi epoch30 bsx2 score 13.94
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     flow: torch.Tensor = torch.tensor([]).to(device)
@@ -176,12 +179,14 @@ def main(args: DictConfig):
             batch: Dict[str, Any]
             event_image = batch["event_volume"].to(device)
             batch_flow = model(event_image) # [1, 2, 480, 640]
+            batch_flow = batch_flow['flow3'] 
             flow = torch.cat((flow, batch_flow), dim=0)  # [N, 2, 480, 640]
         print("test done")
     # ------------------
     #  save submission
     # ------------------
-    file_name = "submission"
+    current_time = time.strftime("%Y%m%d%H%M%S")
+    file_name = f"submission_{current_time}"
     save_optical_flow_to_npy(flow, file_name)
 
 if __name__ == "__main__":

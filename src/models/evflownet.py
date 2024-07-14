@@ -63,6 +63,7 @@ class EVFlowNet(nn.Module):
         flow_dict['flow3'] = flow.clone()
 
         return flow
+        # return flow_dict #CHANGED
         
 
 # if __name__ == "__main__":
